@@ -44,6 +44,7 @@ class Config:
     subset_sizes: list[int]
     data_source: Path | None = None  # None = generate fresh; Path = reuse existing dataset
     epochs:      int = EPOCHS
+    extra_train_kwargs: dict = None  # extra kwargs forwarded to model.train()
 
 
 def test1() -> Config:
@@ -116,6 +117,38 @@ def test5() -> Config:
         subset_sizes = [100, 200, 400, 800, 1600, 2800],
         data_source  = Path("experiments/sq_c30_m15_col/dataset/c30_m15"),
         epochs       = 8,
+    )
+
+
+def test6() -> Config:
+    """Geometric-augmentation ablation — same conditions as test1, sizes 800 and 1600 only.
+
+    All ultralytics geometric augmentations are disabled so the model only sees
+    colour/HSV jitter. Goal: isolate whether geometric augmentation helps or hurts
+    on these synthetically-rendered images where geometry is already varied at
+    generation time.
+    """
+    return Config(
+        run_name     = "sq_c30_m15_col_nogeom",
+        use_square   = True,
+        use_grey     = False,
+        syn_config   = "c30_m15",
+        n_samples    = 4000,
+        subset_sizes = [800, 1600],
+        data_source  = Path("experiments/sq_c30_m15_col/dataset/c30_m15"),
+        extra_train_kwargs = {
+            # Disable all geometric transforms; keep colour augmentations at defaults
+            "degrees":     0.0,
+            "translate":   0.0,
+            "scale":       0.0,
+            "shear":       0.0,
+            "perspective": 0.0,
+            "flipud":      0.0,
+            "fliplr":      0.0,
+            "mosaic":      0.0,
+            "mixup":       0.0,
+            "copy_paste":  0.0,
+        },
     )
 
 
@@ -194,6 +227,7 @@ def run(cfg: Config) -> None:
             exist_ok = True,
             seed     = SEED,
             rect     = not cfg.use_square,
+            **(cfg.extra_train_kwargs or {}),
         )
 
         metrics = model.val(
@@ -219,4 +253,4 @@ def run(cfg: Config) -> None:
 
 
 if __name__ == "__main__":
-    run(test5())   # ← change to test1() / test2() / test3() / test4() / test5() to switch experiments
+    run(test6())   # ← change to test1() / test2() / test3() / test4() / test5() / test6() to switch experiments
